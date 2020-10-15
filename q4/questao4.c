@@ -107,25 +107,26 @@ void *despacha() {
     
     while(sizeRequisicoes == 0) pthread_cond_wait(&newRequisicao, &mutex); // se n tem requisicao fica esperando infinitamente (pq seria esperando a primeira requisicao e tem q ter pelo menos 1 ne o___o)
     while (sizeRequisicoes > 0) {
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < N && bufferRequisicoes[primeiroReq].func != NULL; i++) {
             // atribui a requisicao pra uma da threads
             int rc = pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); 
             printf("Despachou %d\n", primeiroReq);
             sizeRequisicoes--; primeiroReq++;
             // if (primeiro == tamMax) tem q ver isso aqui, tipo o tamMax tá 100, mas tem q tratar isso talvez?
-            struct timespec timeToWait;
-            struct timeval now;
-            int rt;
-            gettimeofday(&now,NULL);
-            timeToWait.tv_sec = now.tv_sec+5;
-            timeToWait.tv_nsec = (now.tv_usec+1000UL)*1000UL;
-            // aqui eu coloco o tempo que tem que esperar, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa
-            if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutex, &timeToWait);
+            if (sizeRequisicoes == 0) break;
         }
+        struct timespec timeToWait;
+        struct timeval now;
+        int rt;
+        gettimeofday(&now,NULL);
+        timeToWait.tv_sec = now.tv_sec+2;
+        timeToWait.tv_nsec = (now.tv_usec+1000UL)*1000UL;
+        // aqui eu coloco o tempo que tem que esperar, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa
+        if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutex, &timeToWait);
     }
     pthread_mutex_unlock(&mutex);
     printf("Despacha morreu\n");
-    pthread_exit(NULL);
+    pthread_exit((void *)1);
 }
 
 int main(void) {
@@ -160,10 +161,10 @@ int main(void) {
     id = agendarExecucao((void *)funexec1, p);
 
     // acho que tem q fzr isso
-    pthread_join(despachante, NULL);
     for (int i = 0 ; i < N ; i++) {
         pthread_join(threads[i], NULL);
     }
+    pthread_join(despachante, NULL);
     printf("Todas as threads acabaram.\n");
     
     free(bufferResultados);
