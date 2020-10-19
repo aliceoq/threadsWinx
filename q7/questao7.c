@@ -15,7 +15,7 @@ int main(void) {
     char arquivo[2];
     int colunas, linhas, qtdPixel, max;
 
-    FILE *file = fopen("in.txt", "r");
+    FILE *file = fopen("in.ppm", "r");
     fscanf(file, "%s", arquivo);
     fscanf(file, "%d", &colunas);
     fscanf(file, "%d", &linhas);
@@ -60,8 +60,8 @@ int main(void) {
         }
     }
     
-    file = fopen("out.txt", "w");
-    //fprintf(file, "%s\n%d %d\n%d\n", arquivo, colunas, linhas, max);
+    file = fopen("out.ppm", "w");
+    fprintf(file, "%s\n%d %d\n%d\n", arquivo, colunas, linhas, max);
     for (int i = 0 ; i < qtdPixel ; i++) {
         for (int j = 0 ; j < 3 ; j++)
             fprintf(file, "%3d ", ans[i]);
