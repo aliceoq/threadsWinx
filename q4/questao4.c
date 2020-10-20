@@ -3,7 +3,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <sys/time.h>
-
+#define TAM_MAX 100
 #define N 2 // representa a quantidade de processadores ou núcleos do sistema
 pthread_t threads[N];
 
@@ -42,7 +42,7 @@ int agendarExecucao(void *funexec, Parametro parameters)
     req.func = funexec;
     bufferRequisicoes[ultimoReq] = req;
     sizeRequisicoes++; ultimoReq++;
-    // if (ultimo == sizeMaxRequisicoes) ~~
+    if (ultimoReq == TAM_MAX) ultimoReq = 0;
     if (sizeRequisicoes == 1) pthread_cond_broadcast(&newRequisicao);
     pthread_mutex_unlock(&mutex);
     return parameters.id;
@@ -71,23 +71,23 @@ int pegarResultadoExecucao(int id)
 // ------------------- FUNÇÕES PARA EXECUTAR PEDIDAS PELA QUESTÃO -------------------
 void *funexec1(void *parameters)
 {
-    //pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);
     Parametro *p = (Parametro *) parameters;
     printf("id %d entrando na funexec1\n", p->id);
     int ans = p->p1 + p->p2;
 
     // salva a resposta no buffer e incrementa a qntd de resultados
     bufferResultados[p->id] = ans; 
-    sizeResultados++;   // precisa de mutex aqui? porque vai ter as duas funções acessando
+    sizeResultados++;
     pthread_cond_signal(&newResultado); // emite o sinal pra o pegarResultadoExecucao olhar se foi o resultado que ele quer
     printf("Emitiu sinal de novo resultado.\n");
-    //pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&mutex);
     pthread_exit(NULL);
 }
 
 void *funexec2(void *parameters)
 {
-    //pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);
     Parametro *p = (Parametro *) parameters;
     printf("id %d entrando na funexec2\n", p->id);
     int ans = p->p1 * p->p2;
@@ -95,7 +95,7 @@ void *funexec2(void *parameters)
     sizeResultados++;
     pthread_cond_signal(&newResultado);
     printf("Emitiu sinal de novo resultado.\n");
-    //pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&mutex);
     pthread_exit(NULL);
 }
 
@@ -111,8 +111,9 @@ void *despacha() {
             // atribui a requisicao pra uma da threads
             int rc = pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); 
             printf("Despachou %d\n", primeiroReq);
+            bufferRequisicoes[primeiroReq].func = NULL;
             sizeRequisicoes--; primeiroReq++;
-            // if (primeiro == tamMax) tem q ver isso aqui, tipo o tamMax tá 100, mas tem q tratar isso talvez?
+            if (primeiroReq == TAM_MAX) primeiroReq = 0;
             if (sizeRequisicoes == 0) break;
         }
         struct timespec timeToWait;
@@ -160,7 +161,7 @@ int main(void) {
     // SÓ AGENDA
     id = agendarExecucao((void *)funexec1, p);
 
-    // acho que tem q fzr isso
+ 
     for (int i = 0 ; i < N ; i++) {
         pthread_join(threads[i], NULL);
     }
