@@ -131,8 +131,8 @@ void *despacha() {
 }
 
 int main(void) {
-    bufferRequisicoes = (Requisicao *) calloc (100, sizeof(Requisicao));
-    bufferResultados = (int *) calloc (100, sizeof(int));
+    bufferRequisicoes = (Requisicao *) calloc (TAM_MAX, sizeof(Requisicao));
+    bufferResultados = (int *) calloc (TAM_MAX, sizeof(int));
 
     pthread_t despachante;
     Parametro p;
