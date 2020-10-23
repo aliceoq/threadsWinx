@@ -13,7 +13,6 @@ void *inc(void *id){
     cont++;
     if (cont == c){
       printf("A thread %d atingiu o valor %d :)\n", tid, cont);
-      pthread_exit(NULL);
     }
     pthread_mutex_unlock(&mymutex);
   }
@@ -33,9 +32,14 @@ int main(void) {
   
   for(int t = 0; t < n; t++){
     //esse mutex eh p garantir que sempre q a main for criar uma thread, ela vai passar pelo if, p saber se o valor ja foi atingido, pq se ja foi, a main termina e n cria mais nenhuma thread
+    int continua = 1;
     pthread_mutex_lock(&mymutex);
     if (cont >= c){
-      pthread_exit(NULL);
+      continua = 0;
+    }
+    pthread_mutex_unlock(&mymutex);
+    if(continua == 0){
+      break;
     }
     taskids[t] = (int *) malloc(sizeof(int));
     *taskids[t] = t;
@@ -44,7 +48,7 @@ int main(void) {
       printf("erro");
       exit(-1);
     }
-    pthread_mutex_unlock(&mymutex);
   }
   pthread_exit(NULL);
+  return 0;
 }
