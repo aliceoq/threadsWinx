@@ -29,7 +29,9 @@ void *contaSubstring(void * pos){
 }
 
 int main(void) {
+    printf("Digite s1 (15 digitos): ");
     scanf("%s", s1);
+    printf("Digite s2 (2 digitos): ");
     scanf("%s", s2);
 
     pthread_t *thread = malloc (p*sizeof(pthread_t));
