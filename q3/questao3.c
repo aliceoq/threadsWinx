@@ -61,5 +61,6 @@ int main(void) {
     
     printf("Quantidade de substrings: %ld\n", qtSub);
     pthread_exit(NULL);
+    free(thread);
     return 0;
 }
