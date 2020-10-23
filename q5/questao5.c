@@ -37,7 +37,7 @@ void *calculaResult(void * pos){
 
 int main() {
     for(long i = 0 ; i < I ; i++) respostas[0][i] = 1;
-
+    printf("Digite a quantidade de threads desejada: ");
     scanf("%ld", &N);
 
     pthread_t *thread = malloc (N*sizeof(pthread_t));
@@ -70,5 +70,7 @@ int main() {
         printf("%lf%c", respostas[P][i], i==I-1?'\n':' ');
     }
 
+    pthread_exit(NULL);
+    free(thread);
     return 0;
 }
