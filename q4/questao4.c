@@ -82,6 +82,7 @@ void *funexec1(void *parameters)
     Parametro *p = (Parametro *) parameters;
     int ans = p->p1 + p->p2;
     // Salva a resposta no buffer e incrementa a qntd de resultados
+    for (int i = 0 ; i < 100000000 ; i++) ans++;
     bufferResultados[p->id] = ans; 
     sizeResultados++;
     pthread_cond_signal(&newResultado); // Emite o sinal pra o pegarResultadoExecucao olhar se foi o resultado que ele quer, precisa emitir toda vez porque o pegarResultadoExecucao quer um resultado específico, então não dá pra emitir só quando for o primeiro resultado no buffer vazio.
@@ -94,6 +95,7 @@ void *funexec2(void *parameters)
     pthread_mutex_lock(&mutexResultado);
     Parametro *p = (Parametro *) parameters;
     int ans = p->p1 * p->p2;
+    for (int i = 0 ; i < 100000000 ; i++) ans++;
     bufferResultados[p->id] = ans;
     sizeResultados++;
     pthread_cond_signal(&newResultado);
@@ -122,7 +124,7 @@ void *despacha() {
         struct timeval now;
         int rt;
         gettimeofday(&now,NULL);
-        timeToWait.tv_sec = now.tv_sec+2;
+        timeToWait.tv_sec = now.tv_sec+5;
         timeToWait.tv_nsec = (now.tv_usec+1000UL)*1000UL;
         // Aqui tem um tempo máximo de espera, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa
         if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutexRequisicao, &timeToWait);
@@ -140,7 +142,7 @@ int main(void) {
     Parametro p;
     p.p1 = 5;
     p.p2 = 3;
-    // CHAMA PRIMEIRO A THREAD QUE DESPACHA, ELA FICA ATÉ 5 SEGUNDOS ESPERANDO REQUISICAO
+    // cria a thread despachante
     int rc = pthread_create(&despachante, NULL, despacha, NULL);
 
     // como o problema não especifica como as requisicoes serão feitas, colocamos todas as requisicoes na main.
