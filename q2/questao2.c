@@ -39,15 +39,16 @@ void *func(void *id){
         strcpy(placa[linha-1],modif);
         threadsF[tid][i]=0;
         before[linha-1]=clock();
+        system("clear");
+        for(int i=0; i<numLinhas; i++){
+          printf("%s" "%s" "%s\n", colors[i], placa[i], reset);
+        }
+        printf("\n");
         while(clock()-before[linha-1]<2000){
         }
         pthread_mutex_unlock(&mutex[linha-1]);
       }
-      system("clear");
-      for(int i=0; i<numLinhas; i++){
-        printf("%s" "%s" "%s\n", colors[i], placa[i], reset);
-      }
-      printf("\n");
+      fclose(file);
     }
   }
   pthread_exit(NULL);
@@ -97,5 +98,15 @@ int main(){
     }
   }
   pthread_exit(NULL);
+  free(threads);
+  free(taskids);
+  free(mutex);
+  free(numF);
+  free(placa);
+  free(before);
+  for(i=0;i<numThreads;i++){
+    free(threadsF[i]);
+  }
+  free(threadsF);
   return 0;
 }
