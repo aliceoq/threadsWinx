@@ -38,12 +38,12 @@ void *func(void *id){
         placa[linha-1]= (char *)realloc(placa[linha-1], (strlen(modif)+1)*sizeof(char));
         strcpy(placa[linha-1],modif);
         threadsF[tid][i]=0;
-        before[linha-1]=clock();
         system("clear");
         for(int i=0; i<numLinhas; i++){
           printf("%s" "%s" "%s\n", colors[i], placa[i], reset);
         }
         printf("\n");
+        before[linha-1]=clock();
         while(clock()-before[linha-1]<2000){
         }
         pthread_mutex_unlock(&mutex[linha-1]);
