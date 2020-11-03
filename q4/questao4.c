@@ -3,15 +3,16 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <sys/time.h>
-#define TAM_MAX 100
-#define N 2 // representa a quantidade de processadores ou núcleos do sistema
+#define TAM_MAX 5
+#define N 2 // Representa a quantidade de processadores ou núcleos do sistema
 pthread_t threads[N];
 
-// Parametro para as funexec
+// Parametros para as funexec
 typedef struct parametro {
     int p1;
     int p2;
-    int id;
+    int idRequisicao;
+    int idThread;
 }Parametro;
 
 // Struct pra salvar cada requisicao no buffer
@@ -23,51 +24,44 @@ typedef struct requisicao {
 // ------------------- DECLARAÇÃO DE VARIAVEIS ETC -------------------
 Requisicao *bufferRequisicoes;
 int *bufferResultados;
+int threadOcupada[N] = {0};
 int sizeRequisicoes = 0;
 int sizeResultados = 0;
 int primeiroReq = 0;
 int ultimoReq = 0;
-// sinal emitido quando houver uma nova requisicao, para a thread despachante ser acordada
-pthread_cond_t newRequisicao = PTHREAD_COND_INITIALIZER;
-// sinal emitido quando houver um novo resultado no buffer, para a thread que espera o resultado ser acordada
-pthread_cond_t newResultado = PTHREAD_COND_INITIALIZER;
-// mutex para tudo que for alterar as variaveis/buffers sobre os resultados
-pthread_mutex_t mutexResultado = PTHREAD_MUTEX_INITIALIZER;
-// mutex para tudo que for alterar as variaveis/buffers sobre as requisicoes
-pthread_mutex_t mutexRequisicao = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t newRequisicao = PTHREAD_COND_INITIALIZER; // sinal emitido quando houver uma nova requisicao, para a thread despachante ser acordada
+pthread_cond_t newResultado = PTHREAD_COND_INITIALIZER; // sinal emitido quando houver um novo resultado no buffer, para a thread que espera o resultado ser acordada
+pthread_mutex_t mutexResultado = PTHREAD_MUTEX_INITIALIZER; // mutex para tudo que for alterar as variaveis/buffers sobre os resultados
+pthread_mutex_t mutexRequisicao = PTHREAD_MUTEX_INITIALIZER; // mutex para tudo que for alterar as variaveis/buffers sobre as requisicoes
 
 // ------------------- FUNÇÕES PEDIDAS PELA QUESTÃO -------------------
 int agendarExecucao(void *funexec, Parametro parameters)
 {
     pthread_mutex_lock(&mutexRequisicao);
+    Requisicao req; req.p = parameters; req.func = funexec;
+
     printf("\e[0;101m Agendando requisicao %d...\e[0m\n", ultimoReq);
-    parameters.id = ultimoReq;
-    Requisicao req;
-    req.p = parameters;
-    req.func = funexec;
-    // coloca a requisicao no buffer
-    bufferRequisicoes[ultimoReq] = req;
+    req.p.idRequisicao = ultimoReq;
+    bufferRequisicoes[ultimoReq] = req; // coloca a requisicao no buffer
     sizeRequisicoes++; ultimoReq++;
-    // se chegou no tamanho máximo, temos que voltar a colocar as requisicoes no inicio do buffer, então ultimoReq = 0
-    if (ultimoReq == TAM_MAX) ultimoReq = 0;
-    // se nao tinha nenhuma outra requisicao ele emite o sinal de uma nova requisicao para a thread despachante
-    if (sizeRequisicoes == 1) pthread_cond_broadcast(&newRequisicao);
+    if (ultimoReq == TAM_MAX) ultimoReq = 0; // se chegou no tamanho máximo, temos que voltar a colocar as requisicoes no inicio do buffer, então ultimoReq = 0
+    if (sizeRequisicoes == 1) pthread_cond_broadcast(&newRequisicao); // se nao tinha nenhuma outra requisicao ele emite o sinal de uma nova requisicao para a thread despachante
     pthread_mutex_unlock(&mutexRequisicao);
-    return parameters.id;
+
+    return req.p.idRequisicao;
 }
 
 int pegarResultadoExecucao(int id)
 {
     pthread_mutex_lock(&mutexResultado);
-    printf("\e[0;101m Tentando pegar o resultado do id %d...\e[0m\n", id);
     int ans = 0;
-    // se nao tiver resultado ou se o resultado que eu quero não chegou, vou ficar esperando
     while (sizeResultados == 0 || (sizeResultados > 0 && bufferResultados[id] == 0)) {
-        printf("Esperando novo resultado...\n");
+        // Se o bufferResultados está vazio ou se o resultado que eu quero não chegou, vamos esperar o sinal newResultado até chegar o resultado.
         pthread_cond_wait(&newResultado, &mutexResultado);
-        // se o sinal nao foi emitido pelo resultado que ele quer, a thread vai dormir de novo
     }
     // salvo a resposta e depois coloco 0 naquela posicao do buffer, esse vai ser o valor de quando não temos nada naquela posicao.
+    printf("\e[44m Pegando o resultado do id %d...\e[0m\n", id);
     ans = bufferResultados[id];
     bufferResultados[id] = 0;
     sizeResultados--;
@@ -78,28 +72,38 @@ int pegarResultadoExecucao(int id)
 // ------------------- FUNÇÕES PARA EXECUTAR PEDIDAS PELA QUESTÃO -------------------
 void *funexec1(void *parameters)
 {
-    pthread_mutex_lock(&mutexResultado);
     Parametro *p = (Parametro *) parameters;
     int ans = p->p1 + p->p2;
-    // Salva a resposta no buffer e incrementa a qntd de resultados
+    
+    // Isso é só pra levar mais tempo pra concluir
     for (int i = 0 ; i < 100000000 ; i++) ans++;
-    bufferResultados[p->id] = ans; 
+    for (int i = 0 ; i < 100000000 ; i++) ans--;
+    for (int i = 0 ; i < 100000000 ; i++) ans++;
+
+    pthread_mutex_lock(&mutexResultado);
+    bufferResultados[p->idRequisicao] = ans; // Salva a resposta no buffer
     sizeResultados++;
-    pthread_cond_signal(&newResultado); // Emite o sinal pra o pegarResultadoExecucao olhar se foi o resultado que ele quer, precisa emitir toda vez porque o pegarResultadoExecucao quer um resultado específico, então não dá pra emitir só quando for o primeiro resultado no buffer vazio.
+    pthread_cond_signal(&newResultado); // Emite o sinal para o pegarResultadoExecucao, precisa emitir toda vez porque o pegarResultadoExecucao quer um resultado específico, então não dá pra emitir só quando for o primeiro resultado no buffer vazio.
     pthread_mutex_unlock(&mutexResultado);
+
+    threadOcupada[p->idThread] = 0; // Thread agora está desocupada e pode ser usada pra outra operação
+    printf("funexec1 emitiu novo resultado, thread %d está livre.\n", p->idThread);
     pthread_exit(NULL);
 }
 
 void *funexec2(void *parameters)
 {
-    pthread_mutex_lock(&mutexResultado);
     Parametro *p = (Parametro *) parameters;
     int ans = p->p1 * p->p2;
-    for (int i = 0 ; i < 100000000 ; i++) ans++;
-    bufferResultados[p->id] = ans;
+
+    pthread_mutex_lock(&mutexResultado);
+    bufferResultados[p->idRequisicao] = ans;
     sizeResultados++;
     pthread_cond_signal(&newResultado);
     pthread_mutex_unlock(&mutexResultado);
+
+    threadOcupada[p->idThread] = 0;
+    printf("funexec2 emitiu novo resultado, thread %d está livre.\n", p->idThread);
     pthread_exit(NULL);
 }
 
@@ -107,31 +111,32 @@ void *funexec2(void *parameters)
 
 void *despacha() {
     pthread_mutex_lock(&mutexRequisicao);
-    printf("\e[0;101m Despachando...\e[0m\n");
-    
-    while(sizeRequisicoes == 0) pthread_cond_wait(&newRequisicao, &mutexRequisicao); // Caso não tenha requisicao ele vai ficar esperando até que tenha.
+    while (sizeRequisicoes == 0) pthread_cond_wait(&newRequisicao, &mutexRequisicao); // Caso não tenha requisicao ele vai ficar esperando até que tenha.
     while (sizeRequisicoes > 0) {
         for (int i = 0; i < N && bufferRequisicoes[primeiroReq].func != NULL; i++) {
-            // Atribui a requisicao pra uma da threads
-            int rc = pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); 
+            if (threadOcupada[i] == 0) { // Se a thread atual estiver desocupada, vamos atribuir a requisicao pra ela.
+                threadOcupada[i] = 1;
+                bufferRequisicoes[primeiroReq].p.idThread = i;
+                pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); 
+            }
+            else continue;
             printf("Despachou %d\n", primeiroReq);
             bufferRequisicoes[primeiroReq].func = NULL;
             sizeRequisicoes--; primeiroReq++;
-            if (primeiroReq == TAM_MAX) primeiroReq = 0;
+
+            if (primeiroReq == TAM_MAX) primeiroReq = 0; // Voltar para o início do buffer de requisições
             if (sizeRequisicoes == 0) break;
         }
         struct timespec timeToWait;
         struct timeval now;
-        int rt;
         gettimeofday(&now,NULL);
         timeToWait.tv_sec = now.tv_sec+5;
         timeToWait.tv_nsec = (now.tv_usec+1000UL)*1000UL;
-        // Aqui tem um tempo máximo de espera, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa
-        if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutexRequisicao, &timeToWait);
+        if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutexRequisicao, &timeToWait); // Aqui tem um tempo máximo de espera, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa.
     }
     pthread_mutex_unlock(&mutexRequisicao);
     printf("Fim da espera por requisicao.\n");
-    pthread_exit((void *)1);
+    pthread_exit(NULL);
 }
 
 int main(void) {
@@ -139,39 +144,29 @@ int main(void) {
     bufferResultados = (int *) calloc (TAM_MAX, sizeof(int));
 
     pthread_t despachante;
-    Parametro p;
-    p.p1 = 5;
-    p.p2 = 3;
-    // cria a thread despachante
-    int rc = pthread_create(&despachante, NULL, despacha, NULL);
+    pthread_create(&despachante, NULL, despacha, NULL); // Cria a thread despachante
+    
+    int ids[10]; 
+    for (int i = 0 ; i < 5 ; i++) {
+        Parametro p; p.p1 = i + 1; p.p2 = (i+1)*2;
+        if (i%2 == 1) ids[i] = agendarExecucao((void *)funexec1, p);
+        else ids[i] = agendarExecucao((void *)funexec2, p);
+    }
+    for (int i = 0 ; i < 5 ; i++) {
+        int ans = pegarResultadoExecucao(ids[i]);
+        printf("\e[0;105m Resultado de %d: %d \e[0m\n", ids[i], ans);
+    }
+    /*
+    for (int i = 0 ; i < 10 ; i++) {
+        Parametro p; p.p1 = i; p.p2 = i+2;
+        if (i%2 == 1) ids[i] = agendarExecucao((void *)funexec1, p);
+        else ids[i] = agendarExecucao((void *)funexec2, p);
+        int ans = pegarResultadoExecucao(ids[i]);
+        printf("\e[0;105m Resultado de %d: %d \e[0m\n", ids[i], ans);
+    }
+    */
 
-    // como o problema não especifica como as requisicoes serão feitas, colocamos todas as requisicoes na main.
-
-    // AGENDA E PEGA RESULTADO DO ID 0
-    // resultado esperado = 8    
-    int id = agendarExecucao((void *)funexec1, p);
-
-    int ans = pegarResultadoExecucao(id);
-    printf("\e[0;105m Resultado de %d: %d \e[0m\n", id, ans);
-
-    // SÓ AGENDA
-    id = agendarExecucao((void *)funexec1, p);
-    id = agendarExecucao((void *)funexec1, p);
-
-    // AGENDA E PEGA RESULTADO DO ID 3
-    // resultado esperado = 15
-    id = agendarExecucao((void *)funexec2, p);
-    ans = pegarResultadoExecucao(id);
-    printf("\e[0;105m Resultado de %d: %d \e[0m\n", id, ans);
-
-    // SÓ AGENDA
-    p.p1 = 10;
-    p.p2 = 3;
-    id = agendarExecucao((void *)funexec2, p);
-    ans = pegarResultadoExecucao(id);
-    printf("\e[0;105m Resultado de %d: %d \e[0m\n", id, ans);
- 
-    // espera o fim de todas as threads
+    // Espera o fim de todas as threads
     for (int i = 0 ; i < N ; i++) {
         pthread_join(threads[i], NULL);
     }
