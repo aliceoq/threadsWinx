@@ -1,0 +1,6 @@
+3 
+ABC123 Paris        19:00
+7
+QWE497 Lisboa       18:50
+1
+GHD056 Frankfurt    20:00
