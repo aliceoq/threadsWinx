@@ -8,7 +8,8 @@ int **matriz;   // matriz de pixels
 int qtdPixel = 0;
 
 // essa funcao eh a responsavel por deixar o pixel na escala de cinza;
-// cada thread modifica apenas o pixel que possui o indice = indice da thread + NUM_THREADS*n, onde n vai ser a quantidade de pixels que essa thread irá modificar.
+// cada thread modifica apenas o pixel que possui o indice = indice da thread + NUM_THREADS*n, onde n vai de 0 até a quantidade de pixels que ela vai modificar menos um.
+// ex: thread[0] modificando 3 pixels: matriz[0+4*0] + matriz[0+4*1] e matriz[0+4*2]
 void *transforma(void * i){
     long index = (long)i;
     for (int i = index ; i < qtdPixel ; i += NUM_THREADS) {
@@ -75,6 +76,9 @@ int main(void) {
     }
     fclose(file);
     
+    for (int i = 0 ; i < qtdPixel ; i++) free(matriz[i]);
+    free(matriz);
+    free(ans);
     pthread_exit(NULL);
     return 0;
 }
