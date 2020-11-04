@@ -131,7 +131,6 @@ void *despacha() {
         struct timeval now;
         gettimeofday(&now,NULL);
         timeToWait.tv_sec = now.tv_sec+5;
-        timeToWait.tv_nsec = (now.tv_usec+1000UL)*1000UL;
         if (sizeRequisicoes == 0) pthread_cond_timedwait(&newRequisicao, &mutexRequisicao, &timeToWait); // Aqui tem um tempo máximo de espera, pra nao ficar infinitamente esperando uma requisicao quando ja tiver chegado no fim do programa.
     }
     pthread_mutex_unlock(&mutexRequisicao);
