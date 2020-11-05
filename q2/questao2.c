@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-#include <time.h>
+#include <sys/time.h>
 
 int numArquivos, numLinhas;
 //guarda quantos arquivos ficam com cada thread
@@ -15,7 +15,12 @@ pthread_mutex_t print = PTHREAD_MUTEX_INITIALIZER;
 char colors[8][10] = {"\e[41m", "\e[43m", "\e[44m", "\e[45m", "\e[42m", "\e[40m", "\e[46m", "\e[47m"};
 char reset[10] = "\e[0m";
 
-clock_t *before;
+void printa(){
+  system("clear");
+  for(int i=0; i<numLinhas; i++){
+  printf("%s" "%s" "%s\n", colors[i], placa[i], reset);
+  }
+}
 
 void *func(void *id){
   char arquivo[9]="arq0.txt";
@@ -38,14 +43,16 @@ void *func(void *id){
         placa[linha-1]= (char *)realloc(placa[linha-1], (strlen(modif)+1)*sizeof(char));
         strcpy(placa[linha-1],modif);
         threadsF[tid][i]=0;
-        system("clear");
-        for(int i=0; i<numLinhas; i++){
-          printf("%s" "%s" "%s\n", colors[i], placa[i], reset);
-        }
-        printf("\n");
-        before[linha-1]=clock();
-        while(clock()-before[linha-1]<2000){
-        }
+        pthread_mutex_lock(&print);
+        printa();
+        pthread_mutex_unlock(&print);
+        struct timespec timeToWait;
+        struct timeval now;
+        gettimeofday(&now,NULL);
+        timeToWait.tv_sec = now.tv_sec+2;
+        do {
+          gettimeofday(&now, NULL);
+        } while (now.tv_sec != timeToWait.tv_sec);
         pthread_mutex_unlock(&mutex[linha-1]);
       }
       fclose(file);
@@ -71,7 +78,6 @@ int main(){
   int *taskids[numThreads];
   threadsF= (int **)malloc(numThreads*sizeof(int *));
   numF = (int *)calloc(numThreads, sizeof(int));
-  before = (clock_t *)malloc(numLinhas*sizeof(clock_t));
   i=0;
   int j=0;
   //numero q representa cada arquivo
@@ -103,7 +109,6 @@ int main(){
   free(mutex);
   free(numF);
   free(placa);
-  free(before);
   for(i=0;i<numThreads;i++){
     free(threadsF[i]);
   }
