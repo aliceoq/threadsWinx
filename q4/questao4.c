@@ -5,8 +5,8 @@
 #include <sys/time.h>
 #define TAM_MAX 5
 #define N 2 // Representa a quantidade de processadores ou núcleos do sistema
-pthread_t threads[N];
 
+pthread_t threads[N];
 // Parametros para as funexec
 typedef struct parametro {
     int p1;
@@ -27,8 +27,8 @@ int *bufferResultados;
 int threadOcupada[N] = {0};
 int sizeRequisicoes = 0;
 int sizeResultados = 0;
-int primeiroReq = 0;
-int ultimoReq = 0;
+int primeiroReq = 0; // index para a prox posicao do buffer que vai ser despachada
+int ultimoReq = 0; // index para a prox posicao do buffer a ser preenchida
 
 pthread_cond_t newRequisicao = PTHREAD_COND_INITIALIZER; // sinal emitido quando houver uma nova requisicao, para a thread despachante ser acordada
 pthread_cond_t newResultado = PTHREAD_COND_INITIALIZER; // sinal emitido quando houver um novo resultado no buffer, para a thread que espera o resultado ser acordada
@@ -75,7 +75,7 @@ void *funexec1(void *parameters)
     Parametro *p = (Parametro *) parameters;
     int ans = p->p1 + p->p2;
     
-    // Isso é só pra levar mais tempo pra concluir
+    // Isso é só pra levar mais tempo pra concluir e ter uma diferença de tempo entre as duas funexec
     for (int i = 0 ; i < 100000000 ; i++) ans++;
     for (int i = 0 ; i < 100000000 ; i++) ans--;
     for (int i = 0 ; i < 100000000 ; i++) ans++;
@@ -116,15 +116,15 @@ void *despacha() {
         for (int i = 0; i < N && bufferRequisicoes[primeiroReq].func != NULL; i++) {
             if (threadOcupada[i] == 0) { // Se a thread atual estiver desocupada, vamos atribuir a requisicao pra ela.
                 threadOcupada[i] = 1;
-                bufferRequisicoes[primeiroReq].p.idThread = i;
-                pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); 
+                bufferRequisicoes[primeiroReq].p.idThread = i; // atualiza o id da thread que vai ficar responsável por aquela execução
+                pthread_create(&threads[i], NULL, bufferRequisicoes[primeiroReq].func, (void *)&bufferRequisicoes[primeiroReq].p); // cria a thread que vai executar uma das funexec 
             }
             else continue;
             printf("Despachou %d\n", primeiroReq);
             bufferRequisicoes[primeiroReq].func = NULL;
             sizeRequisicoes--; primeiroReq++;
 
-            if (primeiroReq == TAM_MAX) primeiroReq = 0; // Voltar para o início do buffer de requisições
+            if (primeiroReq == TAM_MAX) primeiroReq = 0; // Se a última requisicao foi na ultima posicao, agora vamos começar a colocar no inicio do buffer novamente.
             if (sizeRequisicoes == 0) break;
         }
         struct timespec timeToWait;
@@ -145,6 +145,7 @@ int main(void) {
     pthread_t despachante;
     pthread_create(&despachante, NULL, despacha, NULL); // Cria a thread despachante
     
+    // Entrada, primeiros vamos agendar todas as requisicoes e depois pegar todos os resultados em ordem
     int ids[10]; 
     for (int i = 0 ; i < 5 ; i++) {
         Parametro p; p.p1 = i + 1; p.p2 = (i+1)*2;
@@ -155,7 +156,8 @@ int main(void) {
         int ans = pegarResultadoExecucao(ids[i]);
         printf("\e[0;105m Resultado de %d: %d \e[0m\n", ids[i], ans);
     }
-    /*
+    
+    /* Outra opcao de entrada, agenda e imediatamente depois pega o resultado da requisicao q foi agendada
     for (int i = 0 ; i < 10 ; i++) {
         Parametro p; p.p1 = i; p.p2 = i+2;
         if (i%2 == 1) ids[i] = agendarExecucao((void *)funexec1, p);
