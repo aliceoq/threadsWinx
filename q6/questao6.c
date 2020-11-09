@@ -1,3 +1,4 @@
+ 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -29,7 +30,7 @@ typedef struct{
     int element;
 }structAux;
 
-//so criando a filinha
+//função para criar a fila bloqueante
 BlockingQueue *newBlockingQueue(unsigned int SizeBuffer){
     BlockingQueue *aux = NULL;
     aux = (BlockingQueue *) malloc(sizeof(BlockingQueue));
@@ -39,15 +40,16 @@ BlockingQueue *newBlockingQueue(unsigned int SizeBuffer){
     aux->statusBuffer = 0;
     return aux;
 }
+//Colocando elementos na fila
 void putBlockingQueue(BlockingQueue *Q, int intnewValue){
-    //bloqueio rapidao
+    //bloqueio o mutex
     pthread_mutex_lock(&mutex);
-    //vejo se o buffer ta cheio, se estiver nao posso colocar as coisas e fico esperando
+    //vejo se o buffer ta cheio. se ele estiver, nao posso colocar inserir elementos na fila, então fico esperando
     while(Q->statusBuffer==buffer_size){
         printf("Nao posso colocar...\n");
         pthread_cond_wait(&empty, &mutex);
     }
-    //aqui eu posso colocar, aí so faço as coisas que guga ensinou
+    //quando chega aqui, já posso inserir elementos
     Elem *aux = NULL;
     Elem *aux2;
     aux = (Elem*) malloc(sizeof(Elem));
@@ -64,11 +66,11 @@ void putBlockingQueue(BlockingQueue *Q, int intnewValue){
         Q->statusBuffer += 1;
     }
     printf("Adicionei: %d\n", intnewValue);
-    //aqui eu vejo se o buffer tem pelo menos 1 item, se tiver eu posso ir tirando
+    //aqui eu vejo se o buffer tem pelo menos 1 item, se tiver, eu sinalizo com o fill para saber que eu posso retirar elementos da fila
     if(Q->statusBuffer>0){
         pthread_cond_broadcast(&fill);
     }
-    //desbloqueio apenas
+    //desbloqueio o mutex
     pthread_mutex_unlock(&mutex);
 }
 void *producer(void* arg){
@@ -83,16 +85,19 @@ void *producer(void* arg){
     printf("Produtor terminou\n");
     pthread_exit(NULL);
 }
+
+//função para remover elementos da fila bloqueante
 int takeBlockingQueue(BlockingQueue* Q){
     int result;
-    //vou de block
+    //bloqueio o mutex
     pthread_mutex_lock(&mutex);
+
+	//Vejo se o buffer está vazio, se sim, eu espero ser colocado um item pra prosseguir 
     while(Q->statusBuffer==0){
-      //se o buffer tiver vazio eu n posso tirar as coisas, ent tem q esperar
         printf("Nao posso tirar...\n");
         pthread_cond_wait(&fill, &mutex);
     }
-    //qnd o buffer deixa de ser 0 eu posso pegar as coisas
+    //quando chega aqui, significa que eu tenho algum item para retirar e então eu o retiro
     Elem *aux;
     aux = (*Q).head;
     (*Q).head = aux->prox;
@@ -122,16 +127,21 @@ void *consumer(void* arg){
 
 int main(int argc, char **argv) {
     long i;
-    //se perguntarem pq fiz struct... tambem nao sei, mas eu uso um negocio dela dps
+	//ponteiro de estrutura, onde possuo a fila bloqueante e o elemento que vou inserir na fila
     structAux structQueue[1];
-    //minha fila ta na struc ent eu crio ela
+    
+	//criando a fila bloqueante
     structQueue->bq = newBlockingQueue(buffer_size);
+
+	//criando as threads consuidoras e produtoras
     pthread_t prod[qtd_threads];
     pthread_t cons[qtd_threads];
     int ids[qtd_threads];
-
+	
+	//inicializo o mutex
     pthread_mutex_init(&mutex, NULL);    
-    //crio as threads
+    
+	//crio as threads
     for(i=0; i<qtd_threads; i++){
         structQueue[0].element = i;
         pthread_create(&(prod[i]), NULL, producer, (void*) &structQueue[0]);
@@ -150,3 +160,4 @@ int main(int argc, char **argv) {
 
     pthread_exit(NULL);
 }
+
